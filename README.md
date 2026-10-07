@@ -8,20 +8,20 @@
 
 ## Команда
 
-- [Имя] — BM25 и RAG
-- [Имя] — Интеграция
-- [Имя] — Продукт и интерфейс
+- [Матвей Рябов] — BM25 и RAG
+- [Губанов Андрей] — Интеграция
+- [Королев Максим] — Продукт и интерфейс
 
 ## Стек
 
 - HTML / CSS / JavaScript
-- BM25 — [укажите библиотеку, например `bm25-turbo`]
-- LLM — [укажите провайдера или WebLLM]
+- BM25 — bm25-turbo
+- LLM — WebLLM
 - Данные — Credit Card Customers (Kaggle)
 
 ## Запуск
 
 ```bash
-git clone <repo-url>
-cd <repo-name>
+git clone https://github.com/No-Name-exe/bank-assistant
+cd git clone https://github.com/No-Name-exe/bank-assistant
 # открыть index.html в браузере
