@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Помощник по удержанию клиентов</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --text: #1a1d24;
+      --muted: #6b7280;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --border: #e5e7eb;
+      --error: #dc2626;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    header p {
+      margin: 4px 0 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    main {
+      max-width: 760px;
+      margin: 32px auto;
+      padding: 0 24px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 80px;
+      padding: 12px;
+      font-family: inherit;
+      font-size: 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      resize: vertical;
+      outline: none;
+    }
+
+    textarea:focus {
+      border-color: var(--accent);
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 12px;
+      align-items: center;
+    }
+
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    button:hover:not(:disabled) { background: var(--accent-hover); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .hint {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .status {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    .status.error { color: var(--error); }
+
+    .answer {
+      white-space: pre-wrap;
+      font-size: 15px;
+    }
+
+    .sources {
+      list-style: none;
+      padding: 0;
+      margin: 12px 0 0;
+    }
+
+    .sources li {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .sources .score {
+      color: var(--muted);
+      font-size: 12px;
+      float: right;
+    }
+
+    .empty {
+      color: var(--muted);
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Помощник по удержанию клиентов</h1>
+    <p>Прототип для КТ1. Поиск и LLM — заглушки.</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <label for="query">Вопрос менеджера</label>
+      <textarea
+        id="query"
+        placeholder="Например: Клиент 45 лет, карта Platinum, транзакции упали на 40%. Кто из похожих ушёл и что с ними делали?"
+      ></textarea>
+      <div class="actions">
+        <button id="submit">Найти</button>
+        <span class="hint">Enter — отправить, Shift+Enter — новая строка</span>
+      </div>
+      <div id="status" class="status"></div>
+    </section>
+
+    <section class="card" id="answer-card" hidden>
+      <label>Ответ</label>
+      <div id="answer" class="answer"></div>
+    </section>
+
+    <section class="card" id="sources-card" hidden>
+      <label>Источники</label>
+      <ul id="sources" class="sources"></ul>
+    </section>
+  </main>
+
+  <script type="module">
+    // ---------- Конфигурация ----------
+    const CONFIG = {
+      topK: 5,
+      llmProvider: "mock", // "mock" | "openai" | "webllm"
+    };
+
+    // ---------- Заглушка корпуса ----------
+    // Позже заменить на загрузку data/corpus.json,
+    // сгенерированного из Credit Card Customers.
+    const MOCK_CORPUS = [
+      {
+        id: "C10001",
+        text: "Клиент 46 лет, жен. Доход $60K–$80K. Карта Platinum. С банком 36 месяцев. Транзакций за год: 45. Сумма транзакций: $3200. Обращений в поддержку: 3. Статус: ушёл.",
+        status: "ушёл",
+      },
+      {
+        id: "C10002",
+        text: "Клиент 44 года, муж. Доход $60K–$80K. Карта Platinum. С банком 34 месяца. Транзакций за год: 52. Сумма транзакций: $3700. Обращений в поддержку: 2. Статус: остался.",
+        status: "остался",
+      },
+      {
+        id: "C10003",
+        text: "Клиент 50 лет, муж. Доход $80K–$120K. Карта Gold. С банком 60 месяцев. Транзакций за год: 120. Сумма транзакций: $9800. Обращений в поддержку: 1. Статус: остался.",
+        status: "остался",
+      },
+      {
+        id: "C10004",
+        text: "Клиент 47 лет, жен. Доход $40K–$60K. Карта Blue. С банком 48 месяцев. Транзакций за год: 30. Сумма транзакций: $1800. Обращений в поддержку: 4. Статус: ушёл.",
+        status: "ушёл",
+      },
+      {
+        id: "C10005",
+        text: "Клиент 45 лет, жен. Доход $60K–$80K. Карта Platinum. С банком 36 месяцев. Транзакций за год: 40. Сумма транзакций: $2900. Обращений в поддержку: 3. Статус: ушёл.",
+        status: "ушёл",
+      },
+    ];
+
+    // ---------- Моковый поиск ----------
+    // Позже заменить на модуль bm25.js.
+    function search(query, k) {
+      const q = query.toLowerCase();
+      const tokens = q.split(/\s+/).filter(Boolean);
+
+      const scored = MOCK_CORPUS.map((doc) => {
+        const text = doc.text.toLowerCase();
+        let score = 0;
+        for (const t of tokens) {
+          if (t.length < 3) continue;
+          if (text.includes(t)) score += 1;
+        }
+        // Небольшой бонус за слово "ушёл" в запросе
+        if (q.includes("ушёл") && doc.status === "ушёл") score += 0.5;
+        return { doc, score };
+      });
+
+      return scored
+        .filter((s) => s.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, k);
+    }
+
+    // ---------- Моковая LLM ----------
+    async function ask(query, documents) {
+      // Позже заменить на вызов API или WebLLM.
+      if (documents.length === 0) {
+        return "Похожих клиентов не найдено. Попробуйте изменить формулировку.";
+      }
+
+      const gone = documents.filter((d) => d.doc.status === "ушёл").length;
+      const stayed = documents.length - gone;
+
+      return [
+        `Найдено ${documents.length} похожих клиентов: ${gone} ушли, ${stayed} остались.`,
+        ``,
+        `Клиенты с похожими признаками (карта Platinum, падение транзакций, несколько обращений в поддержку) чаще уходят.`,
+        `Рекомендация: связаться с клиентом, предложить персональное удержание и уточнить причины снижения активности.`,
+        ``,
+        `(Это заглушка ответа. После КТ1 здесь будет ответ LLM на основе найденных документов.)`,
+      ].join("\n");
+    }
+
+    // ---------- Интерфейс ----------
+    const $query = document.getElementById("query");
+    const $submit = document.getElementById("submit");
+    const $status = document.getElementById("status");
+    const $answerCard = document.getElementById("answer-card");
+    const $answer = document.getElementById("answer");
+    const $sourcesCard = document.getElementById("sources-card");
+    const $sources = document.getElementById("sources");
+
+    function setStatus(text, isError = false) {
+      $status.textContent = text;
+      $status.classList.toggle("error", isError);
+    }
+
+    function renderSources(results) {
+      $sources.innerHTML = "";
+      if (results.length === 0) {
+        $sourcesCard.hidden = true;
+        return;
+      }
+      for (const { doc, score } of results) {
+        const li = document.createElement("li");
+        li.innerHTML = `
+          <span class="score">BM25: ${score.toFixed(2)}</span>
+          <strong>${doc.id}</strong><br />
+          ${doc.text}
+        `;
+        $sources.appendChild(li);
+      }
+      $sourcesCard.hidden = false;
+    }
+
+    async function handleSubmit() {
+      const query = $query.value.trim();
+      if (!query) return;
+
+      $submit.disabled = true;
+      $answerCard.hidden = true;
+      $sourcesCard.hidden = true;
+      setStatus("Идёт поиск…");
+
+      try {
+        const results = search(query, CONFIG.topK);
+        renderSources(results);
+
+        setStatus("Формируется ответ…");
+        const answer = await ask(query, results);
+
+        $answer.textContent = answer;
+        $answerCard.hidden = false;
+
+        setStatus(
+          results.length === 0
+            ? "Ничего не найдено."
+            : `Найдено документов: ${results.length}.`
+        );
+      } catch (err) {
+        console.error(err);
+        setStatus("Произошла ошибка. Попробуйте ещё раз.", true);
+      } finally {
+        $submit.disabled = false;
+      }
+    }
+
+    $submit.addEventListener("click", handleSubmit);
+    $query.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSubmit();
+      }
+    });
+  </script>
+</body>
+</html>
