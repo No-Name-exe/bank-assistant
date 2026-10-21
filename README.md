@@ -23,5 +23,5 @@
 
 ```bash
 git clone https://github.com/No-Name-exe/bank-assistant
-cd git clone https://github.com/No-Name-exe/bank-assistant
-# открыть index.html в браузере
+cd bank-assistant
+# открыть app/index.html в браузере

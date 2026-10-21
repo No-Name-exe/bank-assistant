@@ -4,333 +4,202 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Помощник по удержанию клиентов</title>
-  <style>
-    :root {
-      --bg: #f5f7fb;
-      --card: #ffffff;
-      --text: #1a1d24;
-      --muted: #6b7280;
-      --accent: #2563eb;
-      --accent-hover: #1d4ed8;
-      --border: #e5e7eb;
-      --error: #dc2626;
-    }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.5;
-    }
-
-    header {
-      background: var(--card);
-      border-bottom: 1px solid var(--border);
-      padding: 16px 24px;
-    }
-
-    header h1 {
-      margin: 0;
-      font-size: 18px;
-      font-weight: 600;
-    }
-
-    header p {
-      margin: 4px 0 0;
-      font-size: 13px;
-      color: var(--muted);
-    }
-
-    main {
-      max-width: 760px;
-      margin: 32px auto;
-      padding: 0 24px;
-    }
-
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 16px;
-    }
-
-    label {
-      display: block;
-      font-size: 14px;
-      font-weight: 500;
-      margin-bottom: 8px;
-    }
-
-    textarea {
-      width: 100%;
-      min-height: 80px;
-      padding: 12px;
-      font-family: inherit;
-      font-size: 14px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      resize: vertical;
-      outline: none;
-    }
-
-    textarea:focus {
-      border-color: var(--accent);
-    }
-
-    .actions {
-      display: flex;
-      gap: 12px;
-      margin-top: 12px;
-      align-items: center;
-    }
-
-    button {
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-    }
-
-    button:hover:not(:disabled) { background: var(--accent-hover); }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-
-    .hint {
-      font-size: 12px;
-      color: var(--muted);
-    }
-
-    .status {
-      font-size: 13px;
-      color: var(--muted);
-      margin-top: 8px;
-    }
-
-    .status.error { color: var(--error); }
-
-    .answer {
-      white-space: pre-wrap;
-      font-size: 15px;
-    }
-
-    .sources {
-      list-style: none;
-      padding: 0;
-      margin: 12px 0 0;
-    }
-
-    .sources li {
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 8px;
-      font-size: 13px;
-    }
-
-    .sources .score {
-      color: var(--muted);
-      font-size: 12px;
-      float: right;
-    }
-
-    .empty {
-      color: var(--muted);
-      font-size: 14px;
-    }
-  </style>
+  <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
-
-  <header>
-    <h1>Помощник по удержанию клиентов</h1>
-    <p>Прототип для КТ1. Поиск и LLM — заглушки.</p>
-  </header>
-
-  <main>
-    <section class="card">
-      <label for="query">Вопрос менеджера</label>
-      <textarea
-        id="query"
-        placeholder="Например: Клиент 45 лет, карта Platinum, транзакции упали на 40%. Кто из похожих ушёл и что с ними делали?"
-      ></textarea>
-      <div class="actions">
-        <button id="submit">Найти</button>
-        <span class="hint">Enter — отправить, Shift+Enter — новая строка</span>
+  <div class="app">
+    <button class="sidebar-backdrop" id="sidebar-backdrop" type="button" aria-label="Закрыть меню чатов" hidden></button>
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">Б</span>
+        <span>Помощник банка</span>
       </div>
-      <div id="status" class="status"></div>
-    </section>
+      <button class="new-chat" id="new-chat" type="button">＋ Новый запрос</button>
+      <p class="sidebar-label">Ваши запросы</p>
+      <nav class="chat-list" id="chat-list" aria-label="История чатов"></nav>
+      <p class="sidebar-note">История хранится только до перезагрузки страницы.</p>
+    </aside>
 
-    <section class="card" id="answer-card" hidden>
-      <label>Ответ</label>
-      <div id="answer" class="answer"></div>
-    </section>
+    <main class="workspace">
+      <header class="workspace-header">
+        <div class="workspace-heading">
+          <h1 id="chat-title">Новый запрос</h1>
+          <p class="subtitle">Найдите похожих клиентов и подготовьте рекомендацию</p>
+        </div>
+        <span class="prototype-badge">Демо · поиск и ответ — заглушки</span>
+        <div class="mobile-actions">
+          <button class="mobile-action" id="mobile-chat-toggle" type="button" aria-expanded="false" aria-controls="chat-list">☰ Чаты</button>
+          <button class="mobile-action primary" id="mobile-new-chat" type="button" aria-label="Новый запрос" title="Новый запрос">
+            <span class="mobile-new-icon" aria-hidden="true">＋</span>
+            <span class="mobile-new-label">Новый</span>
+          </button>
+        </div>
+      </header>
 
-    <section class="card" id="sources-card" hidden>
-      <label>Источники</label>
-      <ul id="sources" class="sources"></ul>
-    </section>
-  </main>
+      <div class="content">
+        <details class="panel client-panel" id="client-panel" open>
+          <summary aria-controls="client-fields">
+            <h2 class="section-heading" id="client-heading">
+              Данные клиента
+            </h2>
+            <span class="client-summary" id="client-summary">Данные не указаны</span>
+          </summary>
+          <div class="form-mode" role="group" aria-label="Подробность данных клиента">
+            <button class="form-mode-button active" type="button" data-form-mode="basic" aria-pressed="true">Основные</button>
+            <button class="form-mode-button" type="button" data-form-mode="detailed" aria-pressed="false">Все данные</button>
+          </div>
+          <p class="client-hint">Необязательно: заполните известные признаки или задайте вопрос только сообщением.</p>
+          <div class="client-grid" id="client-fields">
+            <section class="client-group" aria-labelledby="profile-heading">
+              <h3 id="profile-heading">Профиль</h3>
+              <div class="client-fields">
+                <div class="field">
+                  <label for="age" data-short-label="Возраст">Возраст</label>
+                  <input id="age" data-field="age" data-prompt-label="Возраст" data-summary-label="возраст" data-unit="лет" type="number" min="18" max="120" placeholder="45" />
+                </div>
+                <div class="field">
+                  <label for="gender" data-short-label="Пол">Пол</label>
+                  <select id="gender" data-field="gender" data-prompt-label="Пол" data-summary-label="пол">
+                    <option value="">Не указан</option>
+                    <option value="женщина">Женщина</option>
+                    <option value="мужчина">Мужчина</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="dependents" data-short-label="Иждивенцы" data-detail="advanced">Количество иждивенцев</label>
+                  <input id="dependents" data-field="dependents" data-prompt-label="Иждивенцы" data-summary-label="иждивенцы" type="number" min="0" max="5" placeholder="0–5" />
+                </div>
+                <div class="field">
+                  <label for="education" data-short-label="Образование" data-detail="advanced">Образование</label>
+                  <select id="education" data-field="education" data-prompt-label="Образование" data-summary-label="образование">
+                    <option value="">Не указано</option>
+                    <option>Без образования</option>
+                    <option>Среднее образование</option>
+                    <option>Колледж</option>
+                    <option>Высшее образование</option>
+                    <option>Аспирантура</option>
+                    <option>Докторская степень</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="marital" data-short-label="Семейное положение" data-detail="advanced">Семейное положение</label>
+                  <select id="marital" data-field="marital" data-prompt-label="Семейное положение" data-summary-label="семейное положение">
+                    <option value="">Не указано</option>
+                    <option>В браке</option>
+                    <option>Не в браке</option>
+                    <option>В разводе</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="income" data-short-label="Доход">Доход</label>
+                  <select id="income" data-field="income" data-prompt-label="Доход" data-summary-label="доход">
+                    <option value="">Не указан</option>
+                    <option>Менее $40K</option>
+                    <option>$40K–$60K</option>
+                    <option>$60K–$80K</option>
+                    <option>$80K–$120K</option>
+                    <option>$120K+</option>
+                  </select>
+                </div>
+              </div>
+            </section>
+            <section class="client-group" aria-labelledby="account-heading">
+              <h3 id="account-heading">Отношения с банком</h3>
+              <div class="client-fields">
+                <div class="field">
+                  <label for="card" data-short-label="Карта">Тип карты</label>
+                  <select id="card" data-field="card" data-prompt-label="Тип карты" data-summary-label="карта">
+                    <option value="">Не указан</option>
+                    <option>Blue</option>
+                    <option>Silver</option>
+                    <option>Gold</option>
+                    <option>Platinum</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="tenure" data-short-label="С банком" data-detail="advanced">Срок с банком</label>
+                  <input id="tenure" data-field="tenure" data-prompt-label="С банком" data-summary-label="с банком" data-unit="мес" data-detail="advanced" type="number" min="1" max="1000" placeholder="36 мес." />
+                </div>
+                <div class="field">
+                  <label for="products" data-short-label="Продукты" data-detail="advanced">Продуктов банка</label>
+                  <input id="products" data-field="products" data-prompt-label="Количество продуктов банка" data-summary-label="продуктов" data-detail="advanced" type="number" min="1" max="6" placeholder="1–6" />
+                </div>
+              </div>
+            </section>
+            <section class="client-group" aria-labelledby="activity-heading">
+              <h3 id="activity-heading">Активность</h3>
+              <div class="client-fields">
+                <div class="field">
+                  <label for="inactive-months" data-short-label="Без активности" data-detail="advanced">Месяцев без активности</label>
+                  <input id="inactive-months" data-field="inactiveMonths" data-prompt-label="Месяцев без активности за год" data-summary-label="без активности, мес." data-detail="advanced" type="number" min="0" max="6" placeholder="0–6 мес." />
+                </div>
+                <div class="field">
+                  <label for="contacts" data-short-label="Обращения">Обращения в поддержку</label>
+                  <input id="contacts" data-field="contacts" data-prompt-label="Обращений в поддержку за год" data-summary-label="обращений" type="number" min="0" max="6" placeholder="0–6 / год" />
+                </div>
+                <div class="field">
+                  <label for="transaction-count" data-short-label="Транзакции">Количество транзакций</label>
+                  <input id="transaction-count" data-field="transactionCount" data-prompt-label="Количество транзакций" data-summary-label="транзакций" type="number" min="0" placeholder="42" />
+                </div>
+                <div class="field">
+                  <label for="transaction-amount" data-short-label="Сумма, $" data-detail="advanced">Сумма транзакций, $</label>
+                  <input id="transaction-amount" data-field="transactionAmount" data-prompt-label="Сумма транзакций" data-summary-label="сумма транзакций" data-format="currency" data-detail="advanced" type="number" min="0" step="100" placeholder="1 144" />
+                </div>
+                <div class="field">
+                  <label for="amount-change" data-short-label="Сумма Q4/Q1, %">Изменение суммы Q4 к Q1, %</label>
+                  <input id="amount-change" data-field="amountChange" data-prompt-label="Изменение суммы транзакций Q4 к Q1" data-summary-label="сумма Q4 к Q1" data-unit="%" type="number" min="-100" step="0.1" placeholder="−40 или +25" />
+                  <small class="field-hint">Минус — снижение, плюс — рост.</small>
+                </div>
+                <div class="field">
+                  <label for="count-change" data-short-label="Число Q4/Q1, %" data-detail="advanced">Изменение числа транзакций Q4 к Q1, %</label>
+                  <input id="count-change" data-field="countChange" data-prompt-label="Изменение числа транзакций Q4 к Q1" data-summary-label="число Q4 к Q1" data-unit="%" data-detail="advanced" type="number" min="-100" step="0.1" placeholder="−20 или +10" />
+                </div>
+              </div>
+            </section>
+            <section class="client-group" aria-labelledby="credit-heading">
+              <h3 id="credit-heading" data-detail="advanced">Кредитный лимит и задолженность</h3>
+              <div class="client-fields">
+                <div class="field">
+                  <label for="credit-limit" data-short-label="Лимит, $" data-detail="advanced">Кредитный лимит, $</label>
+                  <input id="credit-limit" data-field="creditLimit" data-prompt-label="Кредитный лимит" data-summary-label="лимит" data-format="currency" data-detail="advanced" type="number" min="0" step="100" placeholder="12 691" />
+                </div>
+                <div class="field">
+                  <label for="balance" data-short-label="Использовано, $" data-detail="advanced">Использованный кредит, $</label>
+                  <input id="balance" data-field="revolvingBalance" data-prompt-label="Использованный кредитный лимит" data-summary-label="использовано" data-format="currency" data-detail="advanced" type="number" min="0" step="100" placeholder="777" />
+                </div>
+                <div class="field">
+                  <label for="available-credit" data-short-label="Доступно, $" data-detail="advanced">Доступно по лимиту, $</label>
+                  <input id="available-credit" data-field="availableCredit" data-prompt-label="Доступно по кредитному лимиту" data-summary-label="доступно" data-format="currency" data-detail="advanced" type="number" min="0" step="100" placeholder="11 914" />
+                </div>
+                <div class="field">
+                  <label for="utilization" data-short-label="Использовано, %" data-detail="advanced">Доля использованного лимита, %</label>
+                  <input id="utilization" data-field="utilization" data-prompt-label="Доля использованного кредитного лимита" data-summary-label="использовано от лимита" data-unit="%" data-detail="advanced" type="number" min="0" max="100" step="0.1" placeholder="0–100%" />
+                </div>
+              </div>
+            </section>
+          </div>
+        </details>
 
-  <script type="module">
-    // ---------- Конфигурация ----------
-    const CONFIG = {
-      topK: 5,
-      llmProvider: "mock", // "mock" | "openai" | "webllm"
-    };
+        <section class="chat-area" aria-label="Переписка">
+          <div class="messages" id="messages" aria-live="polite"></div>
+          <form class="composer" id="message-form">
+            <textarea
+              id="message-input"
+              aria-label="Сообщение"
+              placeholder="Клиент и ваш вопрос…"
+              rows="2"
+            ></textarea>
+            <button class="send" id="send" type="submit" aria-label="Отправить сообщение">
+              <span class="send-label">Отправить</span>
+              <span class="send-icon" aria-hidden="true">↑</span>
+            </button>
+          </form>
+          <div class="status" id="status" role="status"></div>
+        </section>
+      </div>
+    </main>
+  </div>
 
-    // ---------- Заглушка корпуса ----------
-    // Позже заменить на загрузку data/corpus.json,
-    // сгенерированного из Credit Card Customers.
-    const MOCK_CORPUS = [
-      {
-        id: "C10001",
-        text: "Клиент 46 лет, жен. Доход $60K–$80K. Карта Platinum. С банком 36 месяцев. Транзакций за год: 45. Сумма транзакций: $3200. Обращений в поддержку: 3. Статус: ушёл.",
-        status: "ушёл",
-      },
-      {
-        id: "C10002",
-        text: "Клиент 44 года, муж. Доход $60K–$80K. Карта Platinum. С банком 34 месяца. Транзакций за год: 52. Сумма транзакций: $3700. Обращений в поддержку: 2. Статус: остался.",
-        status: "остался",
-      },
-      {
-        id: "C10003",
-        text: "Клиент 50 лет, муж. Доход $80K–$120K. Карта Gold. С банком 60 месяцев. Транзакций за год: 120. Сумма транзакций: $9800. Обращений в поддержку: 1. Статус: остался.",
-        status: "остался",
-      },
-      {
-        id: "C10004",
-        text: "Клиент 47 лет, жен. Доход $40K–$60K. Карта Blue. С банком 48 месяцев. Транзакций за год: 30. Сумма транзакций: $1800. Обращений в поддержку: 4. Статус: ушёл.",
-        status: "ушёл",
-      },
-      {
-        id: "C10005",
-        text: "Клиент 45 лет, жен. Доход $60K–$80K. Карта Platinum. С банком 36 месяцев. Транзакций за год: 40. Сумма транзакций: $2900. Обращений в поддержку: 3. Статус: ушёл.",
-        status: "ушёл",
-      },
-    ];
-
-    // ---------- Моковый поиск ----------
-    // Позже заменить на модуль bm25.js.
-    function search(query, k) {
-      const q = query.toLowerCase();
-      const tokens = q.split(/\s+/).filter(Boolean);
-
-      const scored = MOCK_CORPUS.map((doc) => {
-        const text = doc.text.toLowerCase();
-        let score = 0;
-        for (const t of tokens) {
-          if (t.length < 3) continue;
-          if (text.includes(t)) score += 1;
-        }
-        // Небольшой бонус за слово "ушёл" в запросе
-        if (q.includes("ушёл") && doc.status === "ушёл") score += 0.5;
-        return { doc, score };
-      });
-
-      return scored
-        .filter((s) => s.score > 0)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, k);
-    }
-
-    // ---------- Моковая LLM ----------
-    async function ask(query, documents) {
-      // Позже заменить на вызов API или WebLLM.
-      if (documents.length === 0) {
-        return "Похожих клиентов не найдено. Попробуйте изменить формулировку.";
-      }
-
-      const gone = documents.filter((d) => d.doc.status === "ушёл").length;
-      const stayed = documents.length - gone;
-
-      return [
-        `Найдено ${documents.length} похожих клиентов: ${gone} ушли, ${stayed} остались.`,
-        ``,
-        `Клиенты с похожими признаками (карта Platinum, падение транзакций, несколько обращений в поддержку) чаще уходят.`,
-        `Рекомендация: связаться с клиентом, предложить персональное удержание и уточнить причины снижения активности.`,
-        ``,
-        `(Это заглушка ответа. После КТ1 здесь будет ответ LLM на основе найденных документов.)`,
-      ].join("\n");
-    }
-
-    // ---------- Интерфейс ----------
-    const $query = document.getElementById("query");
-    const $submit = document.getElementById("submit");
-    const $status = document.getElementById("status");
-    const $answerCard = document.getElementById("answer-card");
-    const $answer = document.getElementById("answer");
-    const $sourcesCard = document.getElementById("sources-card");
-    const $sources = document.getElementById("sources");
-
-    function setStatus(text, isError = false) {
-      $status.textContent = text;
-      $status.classList.toggle("error", isError);
-    }
-
-    function renderSources(results) {
-      $sources.innerHTML = "";
-      if (results.length === 0) {
-        $sourcesCard.hidden = true;
-        return;
-      }
-      for (const { doc, score } of results) {
-        const li = document.createElement("li");
-        li.innerHTML = `
-          <span class="score">BM25: ${score.toFixed(2)}</span>
-          <strong>${doc.id}</strong><br />
-          ${doc.text}
-        `;
-        $sources.appendChild(li);
-      }
-      $sourcesCard.hidden = false;
-    }
-
-    async function handleSubmit() {
-      const query = $query.value.trim();
-      if (!query) return;
-
-      $submit.disabled = true;
-      $answerCard.hidden = true;
-      $sourcesCard.hidden = true;
-      setStatus("Идёт поиск…");
-
-      try {
-        const results = search(query, CONFIG.topK);
-        renderSources(results);
-
-        setStatus("Формируется ответ…");
-        const answer = await ask(query, results);
-
-        $answer.textContent = answer;
-        $answerCard.hidden = false;
-
-        setStatus(
-          results.length === 0
-            ? "Ничего не найдено."
-            : `Найдено документов: ${results.length}.`
-        );
-      } catch (err) {
-        console.error(err);
-        setStatus("Произошла ошибка. Попробуйте ещё раз.", true);
-      } finally {
-        $submit.disabled = false;
-      }
-    }
-
-    $submit.addEventListener("click", handleSubmit);
-    $query.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        handleSubmit();
-      }
-    });
-  </script>
+  <script defer src="./app.js"></script>
 </body>
 </html>
