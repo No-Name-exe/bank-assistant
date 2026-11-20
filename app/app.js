@@ -1,78 +1,6 @@
-const CONFIG = {
-  topK: 5,
-  llmProvider: "mock",
-};
-
-const MOCK_CORPUS = [
-  {
-    id: "C10001",
-    text: "Клиент 46 лет, жен. Доход $60K–$80K. Карта Platinum. С банком 36 месяцев. Транзакций за год: 45. Сумма транзакций: $3200. Обращений в поддержку: 3. Статус: ушёл.",
-    status: "ушёл",
-  },
-  {
-    id: "C10002",
-    text: "Клиент 44 года, муж. Доход $60K–$80K. Карта Platinum. С банком 34 месяца. Транзакций за год: 52. Сумма транзакций: $3700. Обращений в поддержку: 2. Статус: остался.",
-    status: "остался",
-  },
-  {
-    id: "C10003",
-    text: "Клиент 50 лет, муж. Доход $80K–$120K. Карта Gold. С банком 60 месяцев. Транзакций за год: 120. Сумма транзакций: $9800. Обращений в поддержку: 1. Статус: остался.",
-    status: "остался",
-  },
-  {
-    id: "C10004",
-    text: "Клиент 47 лет, жен. Доход $40K–$60K. Карта Blue. С банком 48 месяцев. Транзакций за год: 30. Сумма транзакций: $1800. Обращений в поддержку: 4. Статус: ушёл.",
-    status: "ушёл",
-  },
-  {
-    id: "C10005",
-    text: "Клиент 45 лет, жен. Доход $60K–$80K. Карта Platinum. С банком 36 месяцев. Транзакций за год: 40. Сумма транзакций: $2900. Обращений в поддержку: 3. Статус: ушёл.",
-    status: "ушёл",
-  },
-];
-
-function search(query, k) {
-  const q = query.toLowerCase();
-  const tokens = q.split(/\s+/).filter(Boolean);
-
-  const scored = MOCK_CORPUS.map((doc) => {
-    const text = doc.text.toLowerCase();
-    let score = 0;
-    for (const t of tokens) {
-      if (t.length < 3) continue;
-      if (text.includes(t)) score += 1;
-    }
-    if (q.includes("ушёл") && doc.status === "ушёл") score += 0.5;
-    return { doc, score };
-  });
-
-  return scored
-    .filter((s) => s.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, k);
-}
-
-async function ask(query, documents, hasClientInformation) {
-  if (!hasClientInformation) {
-    return "Не удалось определить данные клиента в запросе. Заполните блок «Данные клиента» или добавьте в сообщение известные признаки — например возраст, тип карты, доход или активность.";
-  }
-
-  if (documents.length === 0) {
-    return "Похожих клиентов не найдено. Попробуйте изменить формулировку.";
-  }
-
-  const gone = documents.filter((d) => d.doc.status === "ушёл").length;
-  const stayed = documents.length - gone;
-
-  return [
-    `Найдено ${documents.length} похожих клиентов: ${gone} ушли, ${stayed} остались.`,
-    ``,
-    `Клиенты с похожими признаками (карта Platinum, падение транзакций, несколько обращений в поддержку) чаще уходят.`,
-    `Рекомендация: связаться с клиентом, предложить персональное удержание и уточнить причины снижения активности.`,
-    ``,
-    `(Это заглушка ответа. После КТ1 здесь будет ответ LLM на основе найденных документов.)`,
-  ].join("\n");
-}
+import { buildIndex, search } from "./bm25.js";
+import { initLLM, ask } from "./llm.js";
+import { CONFIG } from "./config.js";
 
 const $chatList = document.getElementById("chat-list");
 const $chatTitle = document.getElementById("chat-title");
@@ -95,10 +23,24 @@ const clientFields = [...document.querySelectorAll("[data-field]")];
 const chats = [];
 let activeChat = null;
 let isLoading = false;
+let isReady = false;
+let corpusSize = 0;
 
 function setStatus(text, isError = false) {
   $status.textContent = text;
   $status.classList.toggle("error", isError);
+  // Дублируем в заголовок вкладки: удобно следить за загрузкой модели.
+  document.title = text
+    ? `${text.slice(0, 50)} — Помощник по удержанию клиентов`
+    : "Помощник по удержанию клиентов";
+}
+
+function setReady(ready) {
+  isReady = ready;
+  $send.disabled = !ready || isLoading;
+  $messageInput.disabled = !ready;
+  $newChat.disabled = !ready;
+  $mobileNewChat.disabled = !ready;
 }
 
 function closeChatMenu() {
@@ -277,7 +219,10 @@ function appendMessage(role, text, results = [], prompt = "") {
       id.textContent = doc.id;
       const scoreLabel = document.createElement("span");
       scoreLabel.className = "source-score";
-      scoreLabel.textContent = `BM25: ${score.toFixed(2)} · ${doc.status}`;
+      const risk = doc.meta.churnProbability != null
+        ? ` · оценка оттока: ${(doc.meta.churnProbability * 100).toFixed(0)}%`
+        : "";
+      scoreLabel.textContent = `BM25: ${score.toFixed(2)} · ${doc.meta.status}${risk}`;
       const textContent = document.createElement("div");
       textContent.className = "source-text";
       textContent.textContent = doc.text;
@@ -289,6 +234,13 @@ function appendMessage(role, text, results = [], prompt = "") {
   }
 
   $messages.appendChild(wrapper);
+  $messages.scrollTop = $messages.scrollHeight;
+}
+
+function updateLastAssistantText(text) {
+  const bubbles = $messages.querySelectorAll(".message.assistant .bubble");
+  const last = bubbles[bubbles.length - 1];
+  if (last) last.textContent = text;
   $messages.scrollTop = $messages.scrollHeight;
 }
 
@@ -339,7 +291,7 @@ function createChat() {
 async function handleSubmit(event) {
   event.preventDefault();
   const message = $messageInput.value.trim();
-  if (!message || isLoading) return;
+  if (!message || isLoading || !isReady || !activeChat) return;
 
   const chat = activeChat;
   const clientData = readClientData();
@@ -349,43 +301,96 @@ async function handleSubmit(event) {
   chat.clientData = clientData;
   chat.title = chat.messages.length === 0 ? title : chat.title;
   chat.messages.push({ role: "user", text: message });
+
+  let assistantMessage;
+  if (!hasData) {
+    assistantMessage = {
+      role: "assistant",
+      text: "Не удалось определить данные клиента в запросе. Заполните блок «Данные клиента» или добавьте в сообщение известные признаки — например возраст, тип карты, доход или активность.",
+      results: [],
+      prompt,
+    };
+    chat.messages.push(assistantMessage);
+  } else {
+    const results = search(prompt, CONFIG.topK);
+    assistantMessage = { role: "assistant", text: "", results, prompt };
+    chat.messages.push(assistantMessage);
+  }
+
   $messageInput.value = "";
   resizeMessageInput();
   isLoading = true;
   $send.disabled = true;
   $newChat.disabled = true;
   $mobileNewChat.disabled = true;
-  setStatus(hasData ? "Идёт поиск похожих клиентов…" : "Проверяю данные запроса…");
   renderChat();
 
+  if (!hasData) {
+    setStatus("Данные клиента не указаны.");
+    finishLoading();
+    return;
+  }
+
+  const results = assistantMessage.results;
+  if (!results.length) {
+    assistantMessage.text = "Похожих клиентов не найдено. Попробуйте изменить формулировку.";
+    setStatus("Похожих клиентов не найдено.");
+    finishLoading();
+    return;
+  }
+
+  setStatus("Формируется ответ…");
   try {
-    const results = hasData ? search(prompt, CONFIG.topK) : [];
-    if (hasData) setStatus("Формируется ответ…");
-    const answer = await ask(prompt, results, hasData);
-    chat.messages.push({ role: "assistant", text: answer, results, prompt });
-    setStatus(
-      !hasData
-        ? "Данные клиента не указаны."
-        : results.length
-          ? `Найдено похожих клиентов: ${results.length}.`
-          : "Похожих клиентов не найдено."
-    );
+    const answer = await ask(prompt, results, {
+      onToken: (text) => {
+        assistantMessage.text = text;
+        updateLastAssistantText(text);
+      },
+    });
+    assistantMessage.text = answer;
+    setStatus(`Найдено похожих клиентов: ${results.length}.`);
   } catch (err) {
     console.error(err);
-    chat.messages.push({
-      role: "assistant",
-      text: "Не удалось сформировать ответ, попробуйте позже.",
-      results: [],
-      prompt,
-    });
-    setStatus("Произошла ошибка. Попробуйте ещё раз.", true);
-  } finally {
-    isLoading = false;
-    $send.disabled = false;
-    $newChat.disabled = false;
-    $mobileNewChat.disabled = false;
-    renderChat();
+    // Альтернативный сценарий 2: LLM недоступна — показываем источники без ответа.
+    // Если модель успела выдать часть ответа до обрыва/таймаута — не прячем её.
+    assistantMessage.text = assistantMessage.text
+      ? `${assistantMessage.text}\n\n— ответ не завершён: ${err.message || "ошибка вызова модели"}.`
+      : "Не удалось сформировать ответ, попробуйте позже.";
+    assistantMessage.llmError = true;
+    setStatus("Не удалось сформировать ответ, попробуйте позже", true);
   }
+  finishLoading();
+}
+
+function finishLoading() {
+  isLoading = false;
+  setReady(isReady);
+}
+
+async function init() {
+  setReady(false);
+  setStatus("Загружается корпус клиентов…");
+  try {
+    const response = await fetch(CONFIG.corpusUrl);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const corpus = await response.json();
+    const stats = buildIndex(corpus);
+    corpusSize = stats.docCount;
+    console.log(`Индекс BM25 построен: ${stats.docCount} документов, ${stats.terms} терминов`);
+  } catch (err) {
+    console.error(err);
+    setStatus("Не удалось загрузить корпус клиентов. Запустите сайт через локальный сервер из корня проекта (см. README).", true);
+    return;
+  }
+
+  setStatus("Загружается модель… Первый запуск может занять несколько минут.");
+  const provider = await initLLM((text) => setStatus(text || "Загружается модель…"));
+  setReady(true);
+  setStatus(
+    provider === "webllm"
+      ? `Готово. В базе ${corpusSize} клиентов, модель загружена локально.`
+      : "Готово. WebLLM недоступна — ответы даёт локальная заглушка."
+  );
 }
 
 $newChat.addEventListener("click", createChat);
@@ -423,3 +428,4 @@ $messageInput.addEventListener("keydown", (event) => {
 });
 
 createChat();
+init();

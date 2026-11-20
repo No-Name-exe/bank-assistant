@@ -1,0 +1,13 @@
+{
+  "name": "bank-assistant",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Помощник по удержанию клиентов — клиентский RAG на BM25 и WebLLM (Zero-Server)",
+  "scripts": {
+    "corpus": "node corpus.js",
+    "test": "node --test tests/",
+    "benchmark": "node benchmark/run.js",
+    "serve": "python -m http.server 8000"
+  }
+}

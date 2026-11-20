@@ -1,0 +1,22 @@
+[
+  {
+    "query": "Клиент 45 лет, карта Platinum",
+    "criteria": { "age": 45, "card": "Platinum" }
+  },
+  {
+    "query": "Клиент с картой Platinum, который ушёл. Почему и что делать?",
+    "criteria": { "card": "Platinum", "status": "ушёл" }
+  },
+  {
+    "query": "Клиент 50 лет с картой Gold, риск оттока",
+    "criteria": { "age": 50, "card": "Gold" }
+  },
+  {
+    "query": "Клиент с доходом $60K - $80K и картой Gold",
+    "criteria": { "income": "$60K - $80K", "card": "Gold" }
+  },
+  {
+    "query": "Похожие клиенты с картой Gold, которые ушли",
+    "criteria": { "card": "Gold", "status": "ушёл" }
+  }
+]

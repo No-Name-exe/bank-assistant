@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Проверка WebLLM</title>
+</head>
+<body>
+  <h1>Проверка WebLLM</h1>
+  <pre id="log">Старт…</pre>
+  <script type="module">
+    const log = (text) => {
+      document.getElementById("log").textContent += "\n" + text;
+      document.title = text.slice(0, 60);
+    };
+    try {
+      log("navigator.gpu: " + (navigator.gpu ? "есть" : "НЕТ"));
+      if (navigator.gpu) {
+        const adapter = await navigator.gpu.requestAdapter();
+        log("WebGPU adapter: " + (adapter ? "есть" : "НЕТ"));
+      }
+      const ua = navigator.userAgent;
+      log("UA: " + ua.slice(ua.indexOf(")") + 2, ua.indexOf(")") + 60));
+      const CDNS = [
+        "./vendor/web-llm.js",
+        "https://esm.run/@mlc-ai/web-llm",
+        "https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.89/+esm",
+        "https://unpkg.com/@mlc-ai/web-llm@0.2.89/lib/index.js",
+      ];
+      let webllm = null;
+      for (const url of CDNS) {
+        try {
+          log("Импортирую " + url + " …");
+          webllm = await import(/* @vite-ignore */ url);
+          log("Импорт ок: " + url);
+          break;
+        } catch (err) {
+          log("Не удалось: " + (err && err.message ? err.message : String(err)).slice(0, 80));
+        }
+      }
+      if (!webllm) throw new Error("Все CDN недоступны");
+      log("Создаю движок Qwen2.5-1.5B (быстрый тест)…");
+      const engine = await webllm.CreateMLCEngine(
+        "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
+        { initProgressCallback: (r) => log("progress: " + (r.text || JSON.stringify(r)).slice(0, 90)) }
+      );
+      log("Движок создан, генерирую…");
+      const reply = await engine.chat.completions.create({
+        messages: [{ role: "user", content: "Скажи одним словом: работает?" }],
+        max_tokens: 20,
+      });
+      log("ОТВЕТ МОДЕЛИ: " + reply.choices[0].message.content);
+      log("WEBLLM_OK");
+    } catch (err) {
+      log("ОШИБКА: " + (err && err.message ? err.message : String(err)));
+      log("WEBLLM_FAIL");
+    }
+  </script>
+</body>
+</html>
