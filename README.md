@@ -28,7 +28,7 @@
 ```bash
 git clone https://github.com/No-Name-exe/bank-assistant
 cd bank-assistant
-npm run serve          # или: python -m http.server 8000
+npm run server        # статический сервер на Node.js (serve.js, без зависимостей)
 # открыть http://localhost:8000/app/
 ```
 
