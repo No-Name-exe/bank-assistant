@@ -8,6 +8,6 @@
     "corpus": "node corpus.js",
     "test": "node --test tests/",
     "benchmark": "node benchmark/run.js",
-    "serve": "python -m http.server 8000"
+    "server": "python -m http.server 8000"
   }
 }
