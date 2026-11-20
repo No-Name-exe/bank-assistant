@@ -1,5 +1,5 @@
 // Минимальный статический сервер для разработки (Node.js, без зависимостей).
-// Запуск: npm run serve → http://localhost:8000/app/
+// Запуск: npm run server → http://localhost:8000/app/
 // Сервер нужен только чтобы отдать статику: ES-модули и fetch не работают с file://.
 
 import { createServer } from "node:http";
